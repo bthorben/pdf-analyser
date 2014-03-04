@@ -3,12 +3,21 @@ import hashlib
 
 
 class Entry:
-    def __init__(self, line):
+    def __init__(self, num, line):
+        self.num = num
         self.offset = int(line[0])
         self.gen = int(line[1])
         self.state = line[2]
         self.content = ""
 
+    def load(self, filestream):
+        filestream.seek(self.offset, 0)
+        content = ""
+        line = filestream.readline()
+        while line and not "endobj" in line:
+            content = content + line
+            line = filestream.readline()
+        self.content = content
 
 class Xref:
     def __init__(self, filestream, startxref):
@@ -24,31 +33,27 @@ class Xref:
             print "Error: Found an xref stream, can't handle that"
             return
         self.filestream.readline()
+        linenumber = 0
         for line in self.filestream:
             line = line.strip()
             if not line:
                 break
-            e = Entry(line.split())
+            e = Entry(linenumber, line.split())
             self.entries.append(e)
+            linenumber = linenumber + 1
 
     def makeRef(self, string):
-        parts = string.split()
-        if len(parts) == 3 and parts[2] is "R":
-            return int(parts[0])
-        else:
-            return int(string)
+        if isinstance(string, basestring):
+            parts = string.split()
+            if len(parts) == 3 and parts[2] is "R":
+                return int(parts[0])
+        return int(string)
 
     def getEntry(self, num):
         return self.entries[self.makeRef(num)]
 
-    def fetch(self, e):
-        self.filestream.seek(e.offset, 0)
-        content = ""
-        line = self.filestream.readline()
-        while line and not "endobj" in line:
-            content = content + line
-            line = self.filestream.readline()
-        return content
+    def getOffset(self, num):
+        return self.entries[self.makeRef(num)].offset
 
     def getNumberOfEntries(self):
         return len(self.entries)
@@ -57,7 +62,7 @@ class Xref:
         offsets = defaultdict(int)
         duplicateCount = 0
         for e in self.entries:
-            if e.state == "n":
+            if e.state == "f":
                 continue
             offsets[e.offset] += 1
             if offsets[e.offset] > 1:
@@ -68,9 +73,10 @@ class Xref:
         duplicateCount = 0
         contents = defaultdict(int)
         for e in self.entries:
-            if e.state == "n":
+            if e.state == "f":
                 continue
-            content = self.fetch(e)
+            e.load(self.filestream)
+            content = e.content
             h = hashlib.sha1(content[100:])
             contents[h] += 1
             if contents[h] > 1:

@@ -1,5 +1,6 @@
 from xref import Xref
-from objects import Dictionary
+from dictionary import Dictionary
+from objects import PdfObject
 
 
 class PdfDocument:
@@ -31,10 +32,25 @@ class PdfDocument:
         xrefoffset = int(self.filestream.readline().strip())
         self.xref = Xref(self.filestream, xrefoffset)
 
-        print "yes"
-        print self.trailer.map
-        catalogOffset = self.xref.getEntry(self.trailer.map["Root"]).offset
-        print "catOffset", catalogOffset
+        catalogOffset = self.xref.getOffset(self.trailer.map["Root"])
         self.filestream.seek(catalogOffset)
         self.filestream.readline()
         self.catalog = Dictionary(self.filestream)
+
+    def fetchXref(self, num):
+        e = self.xref.getEntry(num)
+        e.load(self.filestream)
+        return e
+
+    def fetchObjectByXrefEntry(self, xrefEntry):
+        self.filestream.seek(xrefEntry.offset)
+        self.filestream.readline()
+        obj = PdfObject(self, self.filestream.tell())
+        return obj
+
+    def fetchObject(self, num):
+        e = self.xref.getEntry(num)
+        self.filestream.seek(e.offset)
+        self.filestream.readline()
+        obj = PdfObject(self, self.filestream.tell())
+        return obj
