@@ -1,6 +1,7 @@
 from xref import Xref
 from dictionary import Dictionary
 from objects import PdfObject
+import StringIO
 
 
 class PdfDocument:
@@ -42,15 +43,16 @@ class PdfDocument:
         e.load(self.filestream)
         return e
 
-    def fetchObjectByXrefEntry(self, xrefEntry):
-        self.filestream.seek(xrefEntry.offset)
-        self.filestream.readline()
-        obj = PdfObject(self, self.filestream.tell())
+    def fetchObject(self, num):
+        xrefEntry = self.fetchXref(num)
+        xrefEntry.load(self.filestream)
+        stream = StringIO.StringIO(xrefEntry.content)
+        stream.readline()
+        obj = PdfObject(stream, stream.tell())
         return obj
 
-    def fetchObject(self, num):
-        e = self.xref.getEntry(num)
-        self.filestream.seek(e.offset)
-        self.filestream.readline()
-        obj = PdfObject(self, self.filestream.tell())
+    def fetchObjectFromXref(self, xrefEntry):
+        stream = StringIO.StringIO(xrefEntry.content)
+        stream.readline()
+        obj = PdfObject(stream, stream.tell())
         return obj

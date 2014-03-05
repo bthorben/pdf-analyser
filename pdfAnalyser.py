@@ -10,7 +10,7 @@ parser.add_argument("-c", "--checkxref",
                     action="store_true")
 parser.add_argument("-s", "--show",
                     help="Show the fetched xref-entry with the given number")
-parser.add_argument("-sc", "--showcontent",
+parser.add_argument("-o", "--showobject",
                     help="Show the fetched content that this xref entry \
                     points to")
 parser.add_argument("-p", "--page",
@@ -18,6 +18,11 @@ parser.add_argument("-p", "--page",
 parser.add_argument("-g", "--objectgraph",
                     help="Create a graph of all contained objects",
                     action="store_true")
+parser.add_argument("-gc", "--ogc",
+                    help="Create a graph of all objects connected to given n",)
+parser.add_argument("-gcr", "--ogcr",
+                    help="Create a graph of all objects reverse connected to \
+                    given n",)
 args = parser.parse_args()
 
 
@@ -42,18 +47,18 @@ if args.checkxref:
 if args.show:
     args.show = splitArg(args.show)
     for entry in args.show:
-        print "### OBJECT", entry, "###"
-        obj = doc.fetchObject(entry)
-        print obj
-        print "### END OBJECT", entry, "###"
-
-if args.showcontent:
-    args.showcontent = splitArg(args.showcontent)
-    for entry in args.showcontent:
         print "### CONTENT OF ", entry, "###"
         content = doc.fetchXref(entry).content
         print content
         print "### END CONTENT", entry, "###"
+
+if args.showobject:
+    args.showobject = splitArg(args.showobject)
+    for entry in args.showobject:
+        print "### OBJECT", entry, "###"
+        obj = doc.fetchObject(entry)
+        print obj
+        print "### END OBJECT", entry, "###"
 
 if args.page:
     print "### PARSING PAGE", args.page, "###"
@@ -62,4 +67,12 @@ if args.page:
 
 if args.objectgraph:
     graph = objectGraph.ObjectGraph(doc)
-    print str(graph)
+    print graph.getFullGraph()
+
+if args.ogc:
+    graph = objectGraph.ObjectGraph(doc)
+    print graph.getGraphComponent(int(args.ogc))
+
+if args.ogcr:
+    graph = objectGraph.ObjectGraph(doc)
+    print graph.getReversedGraphComponent(int(args.ogcr))

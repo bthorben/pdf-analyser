@@ -9,15 +9,20 @@ class Entry:
         self.gen = int(line[1])
         self.state = line[2]
         self.content = ""
+        self.loaded = False
 
     def load(self, filestream):
+        if self.loaded:
+            return
         filestream.seek(self.offset, 0)
-        content = ""
+        lines = []
         line = filestream.readline()
         while line and not "endobj" in line:
-            content = content + line
+            lines.append(line)
             line = filestream.readline()
-        self.content = content
+        self.content = "".join(lines)
+        self.loaded = True
+
 
 class Xref:
     def __init__(self, filestream, startxref):
