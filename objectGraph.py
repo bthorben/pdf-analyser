@@ -83,15 +83,10 @@ class ObjectGraph:
                 self.nodes[e].addIncomingEdge(n)
         nodeList = [num]
         q = [num]
-        numFontMet = 0
         while len(q) > 0:
             c = q.pop(0)
             self.nodes[c].visited = True
             for e in self.nodes[c].incomingEdges:
-                if self.nodes[c].getType() == "Font":
-                    numFontMet = numFontMet + 1
-                    if numFontMet > 3:
-                        break
                 if not self.nodes[e].visited:
                     nodeList.append(e)
                     q.append(e)
