@@ -27,9 +27,9 @@ class Node:
         type = "T" + str(self.obj.type)
         if self.obj.type == TYPES.DICT:
             if "Type" in self.obj.value:
-                type = str(self.obj.value["Type"])
+                type = type + ", " + str(self.obj.value["Type"])
             elif "FontName" in self.obj.value:
-                type = "FontDescriptor"
+                type = type + ", " + "FontDescriptor"
         return type
 
     def getName(self):

@@ -1,4 +1,5 @@
 from collections import defaultdict
+from objects import PdfObject
 import hashlib
 
 
@@ -23,12 +24,41 @@ class Entry:
         self.content = "".join(lines)
         self.loaded = True
 
+    def setContent(self, content):
+        self.content = content
+        self.loaded = True
+
+    def setStreamContent(self, filestream, content):
+        filestream.seek(self.offset, 0)
+        filestream.readline()
+        streamDict = PdfObject(filestream, filestream.tell())
+        streamDict.value["Length"] = len(content)
+        c = []
+        c.append("%d %d obj" % (self.num, self.gen))
+        c.append("\n")
+        c.append(str(streamDict))
+        c.append("stream\n")
+        c.append(content)
+        c.append("\nendstream\n")
+        self.content = "".join(c)
+        self.loaded = True
+
 
 class Xref:
-    def __init__(self, filestream, startxref):
+    def __init__(self, filestream, startxref=None):
         self.filestream = filestream
-        self.startxref = startxref
         self.entries = []
+        if not startxref:
+            filestream.seek(-150, 2)
+            while True:
+                line = self.filestream.readline()
+                if not line:
+                    print "Error: No StartXref found"
+                    return
+                if "startxref" in line:
+                    break
+            startxref = int(self.filestream.readline().strip())
+        self.startxref = startxref
         self.readXref(startxref)
 
     def readXref(self, startxref):
@@ -41,7 +71,7 @@ class Xref:
         linenumber = 0
         for line in self.filestream:
             line = line.strip()
-            if not line:
+            if not line or line == "trailer":
                 break
             e = Entry(linenumber, line.split())
             self.entries.append(e)
@@ -55,10 +85,12 @@ class Xref:
         return int(string)
 
     def getEntry(self, num):
-        return self.entries[self.makeRef(num)]
+        n = self.makeRef(num)
+        return self.entries[n]
 
     def getOffset(self, num):
-        return self.entries[self.makeRef(num)].offset
+        n = self.makeRef(num)
+        return self.entries[n].offset
 
     def getNumberOfEntries(self):
         return len(self.entries)
@@ -87,3 +119,22 @@ class Xref:
             if contents[h] > 1:
                 duplicateCount = duplicateCount + 1
         return duplicateCount
+
+    def writeTo(self, outputFilestream):
+        offset = outputFilestream.tell()
+        for e in self.entries:
+            if e.state == "f":
+                continue
+            e.load(self.filestream)
+            start = outputFilestream.tell()
+            outputFilestream.write(e.content)
+            outputFilestream.write("endobj\n\n")
+            e.offset = offset
+            offset += outputFilestream.tell() - start
+
+        self.startxref = outputFilestream.tell()
+        outputFilestream.write("xref\n")
+        outputFilestream.write("0 " + str(len(self.entries)) + "\n")
+        for e in self.entries:
+            outputFilestream.write("%010d %05d %c \n" %
+                                   (e.offset, e.gen, e.state))

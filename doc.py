@@ -1,7 +1,27 @@
 from xref import Xref
-from dictionary import Dictionary
 from objects import PdfObject
 import StringIO
+
+
+class FileHeader:
+    def __init__(self, filestream):
+        lineOne = filestream.readline()
+        lineTwo = filestream.readline()
+        self.content = "".join([lineOne, lineTwo])
+
+
+class Trailer:
+    def __init__(self, filestream):
+        filestream.seek(-300, 2)
+        while True:
+            line = filestream.readline()
+            if not line:
+                print "Error: Trailer found"
+                return
+            if "trailer" in line:
+                break
+        self.start = filestream.tell()
+        self.dict = PdfObject(filestream, filestream.tell())
 
 
 class PdfDocument:
@@ -13,30 +33,12 @@ class PdfDocument:
         self.process()
 
     def process(self):
-        self.filestream.seek(-300, 2)
-        while True:
-            line = self.filestream.readline()
-            if not line:
-                print "Error: Trailer found"
-                return
-            if "trailer" in line:
-                break
-        self.trailer = Dictionary(self.filestream)
+        self.header = FileHeader(self.filestream)
+        self.trailer = Trailer(self.filestream)
+        self.xref = Xref(self.filestream)
 
-        while True:
-            line = self.filestream.readline()
-            if not line:
-                print "Error: No StartXref found"
-                return
-            if "startxref" in line:
-                break
-        xrefoffset = int(self.filestream.readline().strip())
-        self.xref = Xref(self.filestream, xrefoffset)
-
-        catalogOffset = self.xref.getOffset(self.trailer.map["Root"])
-        self.filestream.seek(catalogOffset)
-        self.filestream.readline()
-        self.catalog = Dictionary(self.filestream)
+    def xrefEntry(self, num):
+        return self.xref.getEntry(num)
 
     def fetchXref(self, num):
         e = self.xref.getEntry(num)
@@ -56,3 +58,13 @@ class PdfDocument:
         stream.readline()
         obj = PdfObject(stream, stream.tell())
         return obj
+
+    def writeTo(self, filestream):
+        filestream.write(self.header.content)
+        filestream.write("\n")
+        self.xref.writeTo(filestream)
+        filestream.write("\ntrailer\n")
+        filestream.write(str(self.trailer.dict))
+        filestream.write("\nstartxref\n")
+        filestream.write(str(self.xref.startxref))
+        filestream.write("\n%%EOF")

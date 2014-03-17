@@ -6,27 +6,52 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 REF = re.compile("^\s*[0-9]+ [0-9]+ R")
 
+TYPE_CHARS = "/[]<>"
+
 
 class TYPES:
     BOOL = 1
     NUM = 2
     STRING = 3
-    NAME = 4
-    ARRAY = 5
-    DICT = 6
-    STREAM = 7
-    REF = 8
-    NULL = 9
+    BSTRING = 4
+    NAME = 5
+    ARRAY = 6
+    DICT = 7
+    STREAM = 8
+    REF = 9
+    NULL = 10
 
 
 class PdfObject:
-    def __init__(self, stream, offset):
+    def __init__(self, stream, offset=0):
         self.stream = stream
         self.offset = offset
         self.parse()
 
     def __str__(self):
-        return str(self.value)
+        if self.type == TYPES.DICT:
+            output = []
+            output.append("<<\n")
+            for key, value in self.value.iteritems():
+                output.append("/" + key + " ")
+                output.append(str(value))
+                output.append("\n")
+            output.append(">>\n")
+            return "".join(output)
+        elif self.type == TYPES.ARRAY:
+            output = []
+            output.append("[")
+            for value in self.value:
+                output.append(str(value))
+            output.append("]")
+            return "".join(output)
+        elif self.type == TYPES.NUM:
+            numStr = str(self.value)
+            return numStr.replace(".0", "")
+        elif self.type == TYPES.STRING:
+            return "(" + str(self.value) + ")"
+        else:
+            return str(self.value)
 
     def parse(self):
         self.stream.seek(self.offset, 0)
@@ -34,6 +59,8 @@ class PdfObject:
 
     def consumeValue(self):
         curChar = self.stream.read(1)
+        while curChar in string.whitespace:
+            curChar = self.stream.read(1)
         if curChar == "n":
             self.type = TYPES.NULL
             self.stream.read(3)
@@ -47,13 +74,14 @@ class PdfObject:
             self.stream.read(4)
             return False
         if curChar.isdigit() or curChar == "-":
-            ahead = curChar + self.stream.read(50)
-            self.stream.seek(-(len(ahead) - 1), 1)
+            currentPosition = self.stream.tell()
+            ahead = curChar + self.stream.read(32)
+            self.stream.seek(currentPosition)
             match = REF.search(ahead)
             if match is not None:
                 self.type = TYPES.REF
                 ref = match.group(0)
-                self.stream.seek(len(ref), 1)
+                self.stream.seek(len(ref) - 1, 1)
                 return match.group(0)
             else:
                 self.type = TYPES.NUM
@@ -62,8 +90,8 @@ class PdfObject:
             self.type = TYPES.STRING
             return self.consumeUntil(')')
         if curChar == "/":
-            self.type = TYPES.STRING
-            return self.consumeUntil(string.whitespace)
+            self.type = TYPES.NAME
+            return "/" + self.consumeName()
         if curChar == "[":
             self.type = TYPES.ARRAY
             return self.consumeArray()
@@ -73,18 +101,11 @@ class PdfObject:
                 self.type = TYPES.DICT
                 return self.consumeDict()
             else:
-                self.type = TYPES.STRING
+                self.type = TYPES.BSTRING
                 self.stream.seek(-1, 1)
-                return self.consumeUntil('>')
-        self.stream.seek(-300, 1)
-        context = self.stream.read(299)
-        context = context + "###" + curChar + "###"
-        self.stream.seek(1, 1)
-        context = context + self.stream.read(299)
-        print("Error: can't read object, curChar: " + curChar +
-              "\ncontext\n" + context)
-        import pdb
-        pdb.set_trace()
+                return "<" + self.consumeUntil('>') + ">"
+        # should not happen
+        self.debug(curChar)
 
     def consumeUntil(self, endChar):
         string = ""
@@ -97,6 +118,16 @@ class PdfObject:
             lastChar = curChar
             curChar = self.stream.read(1)
         return string
+
+    def consumeName(self):
+        name = ""
+        curChar = self.stream.read(1)
+        while (curChar not in string.whitespace) and \
+              (curChar not in TYPE_CHARS):
+            name = name + curChar
+            curChar = self.stream.read(1)
+        self.stream.seek(-1, 1)
+        return name
 
     def consumeNumber(self, curChar):
         numberString = ""
@@ -126,16 +157,14 @@ class PdfObject:
             curChar = self.stream.read(1)
             if curChar in string.whitespace:
                 continue
+            elif curChar is None:
+                break
             else:
                 data = data + curChar
             if data.endswith(">>"):
                 break
             if curChar == "/":
-                dictKey = ""
-                curChar = self.stream.read(1)
-                while curChar not in string.whitespace:
-                    dictKey = dictKey + curChar
-                    curChar = self.stream.read(1)
+                dictKey = self.consumeDictKey()
                 dictValue = PdfObject(self.stream, self.stream.tell())
                 value[dictKey] = dictValue
                 data = ""
@@ -144,7 +173,22 @@ class PdfObject:
     def consumeDictKey(self):
         key = ""
         curChar = self.stream.read(1)
-        while curChar not in string.whitespace:
+        while (curChar not in string.whitespace) and \
+              (curChar not in TYPE_CHARS):
             key = key + curChar
             curChar = self.stream.read(1)
+        self.stream.seek(-1, 1)
         return key
+
+    def debug(self, curChar):
+        currentPosition = self.stream.tell()
+        self.stream.seek(-300, 1)
+        length = self.stream.tell() - currentPosition
+        context = self.stream.read(length)
+        context = context + "###" + curChar + "###"
+        self.stream.seek(1, 1)
+        context = context + self.stream.read(299)
+        print("Error: can't read object, curChar: " + curChar +
+              "\ncontext\n" + context)
+        import pdb
+        pdb.set_trace()
