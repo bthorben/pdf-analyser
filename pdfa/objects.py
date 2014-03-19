@@ -1,10 +1,12 @@
 import string
 import re
 import logging
+import zlib
 
 
 logging.basicConfig(level=logging.DEBUG)
 REF = re.compile("^\s*[0-9]+ [0-9]+ R")
+STREAM = re.compile("stream[\n]*")
 
 TYPE_CHARS = "/[]<>"
 
@@ -27,31 +29,6 @@ class PdfObject:
         self.stream = stream
         self.offset = offset
         self.parse()
-
-    def __str__(self):
-        if self.type == TYPES.DICT:
-            output = []
-            output.append("<<\n")
-            for key, value in self.value.iteritems():
-                output.append("/" + key + " ")
-                output.append(str(value))
-                output.append("\n")
-            output.append(">>\n")
-            return "".join(output)
-        elif self.type == TYPES.ARRAY:
-            output = []
-            output.append("[")
-            for value in self.value:
-                output.append(str(value))
-            output.append("]")
-            return "".join(output)
-        elif self.type == TYPES.NUM:
-            numStr = str(self.value)
-            return numStr.replace(".0", "")
-        elif self.type == TYPES.STRING:
-            return "(" + str(self.value) + ")"
-        else:
-            return str(self.value)
 
     def parse(self):
         self.stream.seek(self.offset, 0)
@@ -98,14 +75,37 @@ class PdfObject:
         if curChar == "<":
             nextChar = self.stream.read(1)
             if nextChar == "<":
-                self.type = TYPES.DICT
-                return self.consumeDict()
+                dictionary = self.consumeDict()
+                currentPosition = self.stream.tell()
+                content = self.stream.read(50)
+                self.stream.seek(currentPosition)
+                match = STREAM.search(content)
+                if match is not None:
+                    self.type = TYPES.STREAM
+                    self.streamStart = currentPosition + \
+                        match.start() + len(match.group())
+                    try:
+                        length = int(str(dictionary["Length"]))
+                        self.stream.seek(self.streamStart)
+                        c = self.stream.read(length)
+                        if ("Filter" in dictionary) and \
+                           (str(dictionary["Filter"]) == "/FlateDecode"):
+                            self.content = zlib.decompress(c.strip())
+                        else:
+                            self.content = c
+                    except Exception, e:
+                        print ("Looks like a stream, but has no length or "
+                               "content or is wrongly compressed")
+                        raise e
+                else:
+                    self.type = TYPES.DICT
+                return dictionary
             else:
                 self.type = TYPES.BSTRING
                 self.stream.seek(-1, 1)
                 return "<" + self.consumeUntil('>') + ">"
         # should not happen
-        self.debug(curChar)
+        # self.debug(curChar)
 
     def consumeUntil(self, endChar):
         string = ""
@@ -136,6 +136,7 @@ class PdfObject:
             curChar = self.stream.read(1)
         try:
             number = float(numberString)
+            self.stream.seek(-1, 1)
             return number
         except Exception:
             print "not a number: ", numberString
@@ -192,3 +193,38 @@ class PdfObject:
               "\ncontext\n" + context)
         import pdb
         pdb.set_trace()
+
+    def __str__(self):
+        if self.type == TYPES.DICT:
+            return self.printDict()
+        elif self.type == TYPES.STREAM:
+            d = self.printDict()
+            return d + "\n" + self.content
+        elif self.type == TYPES.ARRAY:
+            return self.printArray()
+        elif self.type == TYPES.NUM:
+            numStr = str(self.value)
+            return numStr.replace(".0", "")
+        elif self.type == TYPES.STRING:
+            return "(" + str(self.value) + ")"
+        else:
+            return str(self.value)
+
+    def printDict(self):
+        output = []
+        output.append("<<\n")
+        for key, value in self.value.iteritems():
+            output.append("/" + key + " ")
+            output.append(str(value))
+            output.append("\n")
+        output.append(">>\n")
+        return "".join(output)
+
+    def printArray(self):
+        output = []
+        output.append("[")
+        for value in self.value:
+            output.append(str(value))
+            output.append(" ")
+        output.append("]")
+        return "".join(output)

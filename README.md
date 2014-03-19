@@ -1,18 +1,33 @@
 pdf-analyser
 ============
 
-A relatively simple PDF analyser written in Python. It was created to analyse issues we had with PDF.js. Currently it can only handles uncompressed PDF files. 
+A PDF Analyser written in Python. It enables you to make basic xref integrity
+checks, view objects, replace objects and output the complete objects or just
+components to .dot files
 
-    usage: pdfAnalyser.py [-h] [-c] [-s SHOW] [-o SHOWOBJECT] 
-                      [-g] [-gc OGC] [-gcr OGCR]
-                      pdffile
+    usage: pdfAnalyser [-h] {check, show, replace, graph} ... pdffile
 
 ## Options
 
-* `[-h]` help
-* `[-c]` check the xref table for duplicates (entries and references streams)
-* `[-s SHOW]` show the content of an object as references by e.g. `560 0 R`
-* `[-o SHOWOBJECT]` like show, but prints the parsed object
-* `[-g]` print a DOT-format graph of all objects as nodes and their references as edges
-* `[-g OGC]` as -g but only showing all objects reachable from given object
-* `[-gcr OGCR]` as -g but only showing all objects that lead to given object
+* `check` check the xref table for duplicates (entries and references streams)
+* `show` display the xref, an object or the content of a stream
+```
+objectnumber  The object number to show
+-x, --xref    Show the xref
+-s, --stream  Show the (if possible) decompressed stream
+```
+* `replace` replace an object or stream
+```
+objectnumber  The number of the object to replace
+input         The file to load the data to replace the object with
+output        Where to write the pdf with the replaced object
+--stream      replace just the stream, not the whole object (if possible)
+```
+* `graph` display the object graph in the dot-format
+```
+-f FROMOBJECT, --fromObject FROMOBJECT
+                      Only consider objects reachable from here
+-t TOOBJECT, --toObject TOOBJECT
+                      Only consider objects that lead to here
+```
+* `[-h]` help with the commands

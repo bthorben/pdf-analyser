@@ -1,9 +1,13 @@
-from setuptools import setup, find_packages
-import ez_setup
+setup_args = dict(name="pdfAnalyser",
+                  version="0.1",
+                  packages=["pdfa"],
+                  zip_safe=False)
 
-ez_setup.use_setuptools()
-setup(
-    name="pdfAnalyzer",
-    version="0.1",
-    packages=find_packages()
-)
+try:
+    from setuptools import setup
+    setup_args["entry_points"] = dict(console_scripts=["pdfa=pdfa.main:main"])
+
+except ImportError:
+    from distutils.core import setup
+
+setup(**setup_args)

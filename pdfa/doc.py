@@ -1,5 +1,5 @@
 from xref import Xref
-from objects import PdfObject
+from objects import PdfObject, TYPES
 import StringIO
 
 
@@ -52,6 +52,17 @@ class PdfDocument:
         stream.readline()
         obj = PdfObject(stream, stream.tell())
         return obj
+
+    def fetchStream(self, num):
+        xrefEntry = self.fetchXref(num)
+        xrefEntry.load(self.filestream)
+        stream = StringIO.StringIO(xrefEntry.content)
+        stream.readline()
+        obj = PdfObject(stream, stream.tell())
+        if obj.type == TYPES.STREAM:
+            return obj.content
+        else:
+            return "no stream, is", obj.type
 
     def fetchObjectFromXref(self, xrefEntry):
         stream = StringIO.StringIO(xrefEntry.content)

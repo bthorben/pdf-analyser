@@ -1,47 +1,6 @@
 from collections import defaultdict
-from objects import PdfObject
+from xrefEntry import XrefEntry
 import hashlib
-
-
-class Entry:
-    def __init__(self, num, line):
-        self.num = num
-        self.offset = int(line[0])
-        self.gen = int(line[1])
-        self.state = line[2]
-        self.content = ""
-        self.loaded = False
-
-    def load(self, filestream):
-        if self.loaded:
-            return
-        filestream.seek(self.offset, 0)
-        lines = []
-        line = filestream.readline()
-        while line and not "endobj" in line:
-            lines.append(line)
-            line = filestream.readline()
-        self.content = "".join(lines)
-        self.loaded = True
-
-    def setContent(self, content):
-        self.content = content
-        self.loaded = True
-
-    def setStreamContent(self, filestream, content):
-        filestream.seek(self.offset, 0)
-        filestream.readline()
-        streamDict = PdfObject(filestream, filestream.tell())
-        streamDict.value["Length"] = len(content)
-        c = []
-        c.append("%d %d obj" % (self.num, self.gen))
-        c.append("\n")
-        c.append(str(streamDict))
-        c.append("stream\n")
-        c.append(content)
-        c.append("\nendstream\n")
-        self.content = "".join(c)
-        self.loaded = True
 
 
 class Xref:
@@ -73,7 +32,7 @@ class Xref:
             line = line.strip()
             if not line or line == "trailer":
                 break
-            e = Entry(linenumber, line.split())
+            e = XrefEntry(linenumber, line.split())
             self.entries.append(e)
             linenumber = linenumber + 1
 
@@ -138,3 +97,11 @@ class Xref:
         for e in self.entries:
             outputFilestream.write("%010d %05d %c \n" %
                                    (e.offset, e.gen, e.state))
+
+    def __str__(self):
+        xref = "%d entries for objects\n\n" % (len(self.entries) - 1)
+        for i in range(0, len(self.entries)):
+            e = self.entries[i]
+            xref = xref + "%04d: %010d %05d %c \n" % \
+                (i, e.offset, e.gen, e.state)
+        return xref
