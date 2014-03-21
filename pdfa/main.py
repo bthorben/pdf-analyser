@@ -23,10 +23,6 @@ def check(args):
 
 def show(args):
     document = doc.PdfDocument(args.pdffile)
-    showxref = args.xref
-    if showxref:
-        print '### XREF ###'
-        print str(document.xref)
 
     if not args.objectnumber:
         return
@@ -42,6 +38,12 @@ def show(args):
         else:
             content = document.fetchXref(number).content
         print content,
+
+
+def showxref(args):
+    document = doc.PdfDocument(args.pdffile)
+    print '### XREF ###'
+    print str(document.xref)
 
 
 def replace(args):
@@ -91,13 +93,15 @@ def main():
                                  help='Show one or more objects')
     subp.add_argument('objectnumber', default=1,
                       help='The object number to show')
-    subp.add_argument('-x', '--xref',
-                      help='Show the xref',
-                      action='store_true')
     subp.add_argument('-s', '--stream',
                       help='Show the (if possible) decompressed stream',
                       action='store_true')
     subp.set_defaults(func=show)
+
+    # showxref
+    subp = subparsers.add_parser('showxref',
+                                 help='Show the xref')
+    subp.set_defaults(func=showxref)
 
     # replace
     subp = subparsers.add_parser('replace',
@@ -110,11 +114,9 @@ def main():
                       action='store_true')
     subp.add_argument('input',
                       help='The file to load the data to replace the object \
-                      with',
-                      action='store_true')
+                      with')
     subp.add_argument('output',
-                      help='Where to write the pdf with the replaced object',
-                      action='store_true')
+                      help='Where to write the pdf with the replaced object')
     subp.set_defaults(func=replace)
 
     # graph
