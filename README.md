@@ -2,8 +2,8 @@ pdfAnalyser
 ============
 
 A PDF Analyser written in Python. It enables you to make basic xref integrity
-checks, view objects, replace objects and output the complete objects or just
-components to .dot files
+checks, view objects, replace objects and output the complete object-graph or 
+just components to .dot files
 
     usage: pdfAnalyser [-h] {check, show, replace, graph} ... pdffile
 
