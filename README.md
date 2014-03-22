@@ -1,4 +1,4 @@
-pdf-analyser
+pdfAnalyser
 ============
 
 A PDF Analyser written in Python. It enables you to make basic xref integrity
